@@ -3,15 +3,86 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Document</title>
+    <title>Live Streaming App Clone</title>
+    <!-- Add Tailwind CSS -->
+    <link
+      href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css"
+      rel="stylesheet"
+    />
   </head>
-  <body>
-    <h1>StreamYard Clone</h1>
-    <div>
-      <video id="user-video" autoplay muted></video
-      ><button id="start-btn">Start</button>
+  <body
+    class="bg-gray-900 text-white h-screen flex flex-col justify-center items-center"
+  >
+    <h1 class="text-3xl mb-4 font-semibold">StreamYard Clone</h1>
+    <div class="flex flex-col items-center">
+      <!-- Video elements -->
+      <div class="mb-4 bg-gray-800 p-4 rounded-lg shadow-lg">
+        <video id="user-video" class="mb-2" autoplay muted width="400"></video>
+        <video id="recorded-video" class="hidden" controls width="400"></video>
+      </div>
+      <!-- Buttons -->
+      <div class="flex space-x-4">
+        <button
+          id="start-btn"
+          class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50"
+        >
+          Start
+        </button>
+        <button
+          id="stop-btn"
+          class="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-full shadow-md focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-opacity-50"
+        >
+          Stop
+        </button>
+      </div>
     </div>
     <script src="/socket.io/socket.io.js"></script>
-    <script src="script.js"></script>
+    <script>
+      const userVideo = document.getElementById("user-video");
+      const recordedVideo = document.getElementById("recorded-video");
+      const startButton = document.getElementById("start-btn");
+      const stopButton = document.getElementById("stop-btn");
+
+      let mediaRecorder;
+      const state = { media: null, recordedChunks: [] };
+      const socket = io();
+
+      startButton.addEventListener("click", () => {
+        mediaRecorder = new MediaRecorder(state.media, {
+          audioBitsPerSecond: 128000,
+          videoBitsPerSecond: 250000,
+          framerate: 25,
+        });
+
+        mediaRecorder.ondataavailable = (ev) => {
+          console.log(`Binary Stream Available: ${ev.data}`);
+          state.recordedChunks.push(ev.data);
+          socket.emit("binarystream", ev.data);
+        };
+
+        mediaRecorder.onstop = () => {
+          const blob = new Blob(state.recordedChunks, { type: "video/webm" });
+          const url = URL.createObjectURL(blob);
+          recordedVideo.src = url;
+          recordedVideo.classList.remove("hidden");
+          userVideo.classList.add("hidden");
+        };
+
+        mediaRecorder.start(25);
+      });
+
+      stopButton.addEventListener("click", () => {
+        mediaRecorder.stop();
+      });
+
+      window.addEventListener("load", async () => {
+        const media = await navigator.mediaDevices.getUserMedia({
+          audio: true,
+          video: true,
+        });
+        state.media = media;
+        userVideo.srcObject = media;
+      });
+    </script>
   </body>
 </html>
